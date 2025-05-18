@@ -423,10 +423,6 @@ This is an automated alert from the Construction Site Safety System."""
         print("  * Left click to add points")
         print("  * Right click to finish current zone")
         print("- Press 'c' to clear all zones")
-        print("- Press '+' to increase playback speed")
-        print("- Press '-' to decrease playback speed")
-        print("- Press ']' to skip more frames (faster)")
-        print("- Press '[' to skip fewer frames (slower)")
         print("- Press 'r' to reset playback to normal speed")
         print("- Press 'q' to quit")
 
@@ -560,10 +556,10 @@ if __name__ == "__main__":
     # Configure WhatsApp recipients
     safety_system.whatsapp_config['recipients'] = [
         '+917200811012',  # This is correctly formatted
-        '+917708316528',  # Fixed: Added full country code (India)
+      
     ]
 
-    video_path = r"C:\Users\vishw\PyCharmMiscProject\og scripts\PythonProject\Script files\construction site\WhatsApp Video 2025-05-02 at 15.44.03_69b23286.mp4"
+    path = r"C:\Users\vishw\PyCharmMiscProject\og scripts\PythonProject\Script files\construction site\WhatsApp Video 2025-05-02 at 15.44.03_69b23286.mp4"
 
     if os.path.exists(video_path):
         print(f"Using video file: {video_path}")
