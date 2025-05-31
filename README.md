@@ -32,26 +32,40 @@ git clone https://github.com/yourusername/Construction-Site-Safety-Ensurement.gi
 cd Construction-Site-Safety-Ensurement
 ```
 
-2. Install required packages:
+2. Create and activate a virtual environment (recommended):
 ```bash
-pip install torch torchvision opencv-python pygame pywhatkit
+python -m venv venv
+source venv/bin/activate  # On Linux/Mac
+# OR
+venv\Scripts\activate  # On Windows
 ```
 
-3. Configure environment variables for email notifications:
-```python
-SAFETY_ALERT_EMAIL=your-email@gmail.com
-SAFETY_ALERT_PASSWORD=your-app-specific-password
-SAFETY_ALERT_RECIPIENT=recipient@email.com
+3. Install required packages:
+```bash
+pip install torch torchvision opencv-python pygame pywhatkit pyyaml
 ```
 
 ## 🎮 Usage
 
-1. Run the main script:
+1. Set up environment variables for email notifications:
+```bash
+# Linux/Mac
+export SAFETY_ALERT_EMAIL=your-email@gmail.com
+export SAFETY_ALERT_PASSWORD=your-app-specific-password
+export SAFETY_ALERT_RECIPIENT=recipient@email.com
+
+# Windows (PowerShell)
+$env:SAFETY_ALERT_EMAIL="your-email@gmail.com"
+$env:SAFETY_ALERT_PASSWORD="your-app-specific-password"
+$env:SAFETY_ALERT_RECIPIENT="recipient@email.com"
+```
+
+2. Run the main script:
 ```bash
 python "Construction Site Safety Ensurement.py"
 ```
 
-2. Controls:
+3. Controls:
 - `d` - Enter/exit drawing mode
 - Left click - Add points to danger zone (in drawing mode)
 - Right click - Complete current danger zone (in drawing mode)
