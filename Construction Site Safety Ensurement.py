@@ -1,10 +1,10 @@
-import cv2
+
 import numpy as np
 import time
 import torch
 import pygame
 import os
-import logging
+import loggin
 from datetime import datetime, timedelta
 import threading
 import winsound
@@ -15,7 +15,7 @@ from email.mime.text import MIMEText
 import pywhatkit
 import random
 import platform
-import yaml
+import yam
 from pathlib import Path
 
 
