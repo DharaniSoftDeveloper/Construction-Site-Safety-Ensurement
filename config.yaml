@@ -1,0 +1,26 @@
+# Construction Site Safety System Configuration
+
+# Detection Settings
+confidence_threshold: 0.6
+nms_threshold: 0.4
+model_size: 's'  # Options: 's', 'm', 'l', 'x'
+min_detection_size: 30
+tracking_enabled: true
+
+# Alert Settings
+alert_cooldown: 3.0
+detection_interval: 200
+
+# Email Settings
+email_cooldown: 300
+
+# WhatsApp Settings
+whatsapp:
+  enabled: false
+  cooldown: 300
+
+# Danger Zone Settings
+danger_zone:
+  min_points: 3
+  line_thickness: 2
+  fill_opacity: 0.3
