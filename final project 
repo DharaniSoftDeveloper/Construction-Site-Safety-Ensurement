@@ -1,0 +1,192 @@
+import cv2
+import numpy as np
+from ultralytics import YOLO
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from twilio.rest import Client
+import time
+import requests
+import os
+
+# Configuration
+# YOLO Model
+MODEL_PATH = "path/to/your/yolov8_model.pt"  # Replace with your YOLO model path
+
+# CCTV stream URL (replace with your camera's RTSP or HTTP URL)
+CCTV_STREAM_URL = "rtsp://admin:password@192.168.1.100:554/stream1"  # Example RTSP URL
+
+# Email settings
+EMAIL_SENDER = "your_email@gmail.com"
+EMAIL_PASSWORD = "your_app_password"  # Use app-specific password for Gmail
+EMAIL_RECEIVERS = ["site_engineer@example.com", "site_manager@example.com"]
+
+# Twilio settings for emergency calls
+TWILIO_SID = "your_twilio_sid"
+TWILIO_AUTH_TOKEN = "your_twilio_auth_token"
+TWILIO_PHONE = "+1234567890"
+AMBULANCE_NUMBER = "+1234567891"
+FIRE_DEPT_NUMBER = "+1234567892"
+
+# Danger zone coordinates (example: top-left and bottom-right corners)
+DANGER_ZONES = [
+    ((100, 100, 300, 300), "Heavy Machinery Zone"),  # (x1, y1, x2, y2), label
+    ((400, 400, 600, 600), "Unstable Structure Zone")
+]
+
+# Thresholds
+HELMET_CONFIDENCE = 0.6
+JACKET_CONFIDENCE = 0.6
+COLLAPSE_CONFIDENCE = 0.7
+FALL_CONFIDENCE = 0.7
+
+# Initialize YOLO model
+model = YOLO(MODEL_PATH)
+
+# Initialize Twilio client
+twilio_client = Client(TWILIO_SID, TWILIO_AUTH_TOKEN)
+
+# Email alert function
+def send_email_alert(subject, body):
+    msg = MIMEMultipart()
+    msg["From"] = EMAIL_SENDER
+    msg["To"] = ", ".join(EMAIL_RECEIVERS)
+    msg["Subject"] = subject
+    msg.attach(MIMEText(body, "plain"))
+
+    try:
+        server = smtplib.SMTP("smtp.gmail.com", 587)
+        server.starttls()
+        server.login(EMAIL_SENDER, EMAIL_PASSWORD)
+        server.sendmail(EMAIL_SENDER, EMAIL_RECEIVERS, msg.as_string())
+        server.quit()
+        print("Email alert sent successfully!")
+    except Exception as e:
+        print(f"Failed to send email: {e}")
+
+# Emergency call function
+def make_emergency_call(service, number):
+    try:
+        call = twilio_client.calls.create(
+            to=number,
+            from_=TWILIO_PHONE,
+            twiml=f"<Response><Say voice='Polly.Joanna'>Emergency alert: {service} required at construction site!</Say></Response>"
+        )
+        print(f"Emergency call to {service} initiated: {call.sid}")
+    except Exception as e:
+        print(f"Failed to make {service} call: {e}")
+
+# Function to initialize or reconnect to CCTV stream
+def connect_to_cctv_stream(url, max_retries=5, retry_delay=5):
+    retries = 0
+    while retries < max_retries:
+        cap = cv2.VideoCapture(url)
+        if cap.isOpened():
+            print("Successfully connected to CCTV stream.")
+            return cap
+        else:
+            print(f"Failed to connect to CCTV stream. Retrying ({retries + 1}/{max_retries})...")
+            retries += 1
+            time.sleep(retry_delay)
+    print("Error: Could not connect to CCTV stream after maximum retries.")
+    return None
+
+# Object detection and safety monitoring
+def process_frame(frame):
+    # Run YOLO detection
+    results = model(frame)[0]
+    detections = results.boxes.data.cpu().numpy()  # [x1, y1, x2, y2, conf, cls]
+
+    helmet_detected = False
+    jacket_detected = False
+    collapse_detected = False
+    danger_zone_violation = False
+    fall_detected = False
+
+    # Process detections
+    for det in detections:
+        x1, y1, x2, y2, conf, cls = det
+        label = model.names[int(cls)]
+
+        # Draw bounding box
+        color = (0, 255, 0) if conf > 0.6 else (0, 0, 255)
+        cv2.rectangle(frame, (int(x1), int(y1)), (int(x2), int(y2)), color, 2)
+        cv2.putText(frame, f"{label} {conf:.2f}", (int(x1), int(y1) - 10),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+
+        # Safety checks
+        if label == "worker_helmet" and conf > HELMET_CONFIDENCE:
+            helmet_detected = True
+        elif label == "worker_no_helmet" and conf > HELMET_CONFIDENCE:
+            send_email_alert("Safety Violation", "Worker detected without helmet!")
+        if label == "worker_jacket" and conf > JACKET_CONFIDENCE:
+            jacket_detected = True
+        elif label == "worker_no_jacket" and conf > JACKET_CONFIDENCE:
+            send_email_alert("Safety Violation", "Worker detected without safety jacket!")
+        if label == "collapse" and conf > COLLAPSE_CONFIDENCE:
+            collapse_detected = True
+            send_email_alert("Critical Alert", "Potential site collapse detected!")
+            make_emergency_call("Ambulance", AMBULANCE_NUMBER)
+            make_emergency_call("Fire Department", FIRE_DEPT_NUMBER)
+        if label == "worker_falling" and conf > FALL_CONFIDENCE:
+            fall_detected = True
+            send_email_alert("Critical Alert", "Worker fall detected!")
+            make_emergency_call("Ambulance", AMBULANCE_NUMBER)
+
+        # Danger zone violation check
+        for zone, zone_label in DANGER_ZONES:
+            zx1, zy1, zx2, zy2 = zone
+            if x1 > zx1 and x2 < zx2 and y1 > zy1 and y2 < zy2 and label.startswith("worker"):
+                danger_zone_violation = True
+                send_email_alert("Danger Zone Violation", f"Worker detected in {zone_label}!")
+
+    # Draw danger zones
+    for zone, zone_label in DANGER_ZONES:
+        zx1, zy1, zx2, zy2 = zone
+), (0, 0, 255), 2)
+        cv2.putText(frame, zone_label, (zx1, zy1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+
+    # Status overlay
+    status = "Safe"
+    if not helmet_detected or not jacket_detected or collapse_detected or danger_zone_violation or fall_detected:
+        status = "Unsafe"
+    cv2.putText(frame, f"Status: {status}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1,
+                (0, 255, 0) if status == "Safe" else (0, 0, 255), 2)
+
+    return frame
+
+# Main function
+def main():
+    # Initialize video capture with CCTV stream
+    cap = connect_to_cctv_stream(CCTV_STREAM_URL)
+    if cap is None:
+        print("Exiting due to failure to connect to CCTV stream.")
+        return
+
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            print("Error: Could not read frame. Attempting to reconnect...")
+            cap.release()
+            cap = connect_to_cctv_stream(CCTV_STREAM_URL)
+            if cap is None:
+                print("Reconnection failed. Exiting...")
+                break
+            continue
+
+        # Process frame
+        processed_frame = process_frame(frame)
+
+        # Display frame
+        cv2.imshow("Construction Site Safety Monitoring", processed_frame)
+
+        # Exit on 'q' key
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+
+    # Cleanup
+    cap.release()
+    cv2.destroyAllWindows()
+
+if __name__ == "__main__":
+    main()
